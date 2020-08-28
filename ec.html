@@ -45,6 +45,7 @@
     const setCurve = (a, b) => _ => {
         valueA.innerText = a
         valueB.innerText = b
+        drawCurve(a, b)
     }
     const table = document.querySelector("#curves")
     const headRow = document.createElement('tr')
@@ -74,8 +75,6 @@
         }
         table.appendChild(row)
     }
-
-    const {points, Point} = ec(2, 6, P)
     const margin = {top: 10, right: 30, bottom: 30, left: 60}
     const width = 460 - margin.left - margin.right
     const height = 400 - margin.top - margin.bottom
@@ -103,25 +102,29 @@
                 )
     }
     // Add dots
-    let G;
-    chart.append('g')
-        .selectAll('dot')
-        .data(points)
-        .enter()
-        .append("circle")
-        .attr("fill", "red")
-        .attr("stroke", "black")
-        .attr("stroke-width", 1.5)
-        .attr("cx", pt => 200 + pt.x.sym() * 30)
-        .attr("cy", pt => 200 + pt.y.sym() * 30)
-        .attr("r", 5)
-        .on("click", function (pt) {
-            if (typeof G !== 'undefined')
-                G.attr("fill", "red")
-            G = d3.select(this)
-              .attr("fill", "yellow")
-            drawLines(pt)
-        })
-
+    let G, dots;
+    const drawCurve = (a, b) => {
+        const {points, Point} = ec(a, b, P)
+        if (typeof dots !== 'undefined')
+                dots.remove()
+        dots = chart.append('g')
+            .selectAll('dot')
+            .data(points)
+            .enter()
+            .append("circle")
+            .attr("fill", "red")
+            .attr("stroke", "black")
+            .attr("stroke-width", 1.5)
+            .attr("cx", pt => 200 + pt.x.sym() * 30)
+            .attr("cy", pt => 200 + pt.y.sym() * 30)
+            .attr("r", 5)
+            .on("click", function (pt) {
+                if (typeof G !== 'undefined')
+                    G.attr("fill", "red")
+                G = d3.select(this)
+                .attr("fill", "yellow")
+                drawLines(pt)
+            })
+    }
 </script>
 </html>
