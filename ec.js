@@ -101,7 +101,8 @@ const ec = (a, b, p) => {
                 points.push(new Point(x, y.neg()))
         }
     }
-    return {Point, count, points}
+    const discriminant = new G(a).pow(3).mul(4).add(new G(b).pow(2)).mul(-16)
+    return {Point, count, points, discriminant}
 }
 
 // const {Point:Pt, points:ps} = ec(0, 3, 7); a = new Pt(1, 2); b = new Pt(2, 2)

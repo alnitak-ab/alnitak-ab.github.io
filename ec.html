@@ -6,6 +6,9 @@
     <title>EC</title>
 </head>
 <style>
+    .singular {
+        color: red;
+    }
     #chart {
         border: 1pt solid black;
         width: 90vw;
@@ -31,8 +34,9 @@
 <body>
     <div id="div-eq">
         <code style="font-size: 18pt">
-            y^2 = x^3 + ax + b<br>
-            a = <span id="a">1</span> <br> b = <span id="b">6</span>
+            y^2 = x^3 + αx + β mod <span id="p">7</span><br>
+            α = <span id="a">1</span> β = <span id="b">6</span>
+            Δ = <span id="d">NYI</span>
         </code>
     </div>
     <div id="div-curves">
@@ -42,10 +46,10 @@
 </body>
 
 <script>
-
-    const P = 7
+    const P = parseInt(document.querySelector("#p").innerText)
     const valueA = document.querySelector("#a")
     const valueB = document.querySelector("#b")
+    const valueDelta = document.querySelector("#d")
     const setCurve = (a, b) => _ => {
         valueA.innerText = a
         valueB.innerText = b
@@ -75,6 +79,9 @@
             }
             cell.innerText = cnt
             cell.onclick = setCurve(a, b)
+            if (curve.discriminant.n === 0) {
+                cell.classList.add('singular')
+            }
             row.appendChild(cell)
         }
         table.appendChild(row)
@@ -113,7 +120,8 @@
     // Add dots
     let G, dots;
     const drawCurve = (a, b) => {
-        const {points, Point} = ec(a, b, P)
+        const {points, Point, discriminant} = ec(a, b, P)
+        valueDelta.innerText = discriminant.n
         if (typeof dots !== 'undefined')
                 dots.remove()
         if (typeof path !== 'undefined')
@@ -137,5 +145,6 @@
                 drawLines(pt)
             })
     }
+    drawCurve(parseInt(valueA.innerText), parseInt(valueB.innerText))
 </script>
 </html>
