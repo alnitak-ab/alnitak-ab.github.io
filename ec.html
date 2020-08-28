@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EC</title>
+</head>
+<style>
+    #chart {
+        border: 1pt solid black;
+    }
+    #div-curves {
+        text-align: center;
+    }
+    table {
+        margin-left: auto;
+        margin-right: auto;
+    }
+    td {
+        width: 2em;
+        height: 2em;
+    }
+</style>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="ec.js"></script>
+
+<body>
+    <div id="div-eq">
+        <code style="font-size: 18pt">
+            y^2 = x^3 + ax + b<br>
+            a = <span id="a">1</span> <br> b = <span id="b">6</span>
+        </code>
+    </div>
+    <div id="div-curves">
+        <table id="curves"></table>
+    </div>
+    <div id="chart"></div>
+</body>
+
+<script>
+
+    const P = 7
+    const valueA = document.querySelector("#a")
+    const valueB = document.querySelector("#b")
+    const setCurve = (a, b) => _ => {
+        valueA.innerText = a
+        valueB.innerText = b
+    }
+    const table = document.querySelector("#curves")
+    const headRow = document.createElement('tr')
+    headRow.appendChild(document.createElement('td'))
+    for(let b = 0; b < P; ++b) {
+            const headB =  document.createElement('th')
+            headB.innerText = b;
+            headRow.appendChild(headB)
+    }
+    table.appendChild(headRow)
+    for(let a = 0; a < P; ++a) {
+        const row = document.createElement('tr')
+        const headA =  document.createElement('th')
+        headA.innerText = a
+        row.appendChild(headA)
+        for(let b = 0; b < P; ++b) {
+            const cell = document.createElement('td')
+            const curve = ec(a, b, P);
+            const cnt = curve.count();
+            if (cnt !== curve.points.length) {
+                console.error(`Points count mismatch for ec(${a}, ${b}):`
+                            + `${cnt} ≠ ${curve.points.length}`)
+            }
+            cell.innerText = cnt
+            cell.onclick = setCurve(a, b)
+            row.appendChild(cell)
+        }
+        table.appendChild(row)
+    }
+
+    const {points, Point} = ec(2, 6, P)
+    const margin = {top: 10, right: 30, bottom: 30, left: 60}
+    const width = 460 - margin.left - margin.right
+    const height = 400 - margin.top - margin.bottom
+    const chart = d3.select("#chart")
+            .append("svg")
+              .attr("width", width + margin.left + margin.right)
+              .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+              .attr("transform",
+                    `translate(${margin.left}, ${margin.top})`);
+
+    // Add lines
+    let path
+    const drawLines = pt => {
+        if (typeof path !== 'undefined')
+                path.remove()
+        path = chart.append("path")
+            .datum(Array.from(pt.generate()))
+            .attr("fill", "none")
+            .attr("stroke", "steelblue")
+            .attr("stroke-width", 1.5)
+            .attr("d", d3.line()
+                .x(pt => 200 + pt.x.sym() * 30)
+                .y(pt => 200 + pt.y.sym() * 30)
+                )
+    }
+    // Add dots
+    let G;
+    chart.append('g')
+        .selectAll('dot')
+        .data(points)
+        .enter()
+        .append("circle")
+        .attr("fill", "red")
+        .attr("stroke", "black")
+        .attr("stroke-width", 1.5)
+        .attr("cx", pt => 200 + pt.x.sym() * 30)
+        .attr("cy", pt => 200 + pt.y.sym() * 30)
+        .attr("r", 5)
+        .on("click", function (pt) {
+            if (typeof G !== 'undefined')
+                G.attr("fill", "red")
+            G = d3.select(this)
+              .attr("fill", "yellow")
+            drawLines(pt)
+        })
+
+</script>
+</html>
