@@ -71,9 +71,13 @@ const ec = (a, b, p) => {
         const g = this
         let gn = this.double()
         yield g
+        if (g.eq(gn) || Number.isNaN(gn.x.n))
+            return
         do {
             yield gn
             gn = gn.add(g)
+            if (Number.isNaN(gn.x.n))
+                return
         } while (g.x.n !== gn.x.n)
         yield gn
     }
