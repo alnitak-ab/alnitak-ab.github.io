@@ -8,6 +8,10 @@
 <style>
     #chart {
         border: 1pt solid black;
+        width: 90vw;
+        height: 90vw;
+        margin-left: auto;
+        margin-right: auto;
     }
     #div-curves {
         text-align: center;
@@ -75,9 +79,10 @@
         }
         table.appendChild(row)
     }
-    const margin = {top: 10, right: 30, bottom: 30, left: 60}
-    const width = 460 - margin.left - margin.right
-    const height = 400 - margin.top - margin.bottom
+    const chartDiv = document.querySelector("#chart")
+    const margin = {top: 10, right: 10, bottom: 10, left: 10}
+    const width = chartDiv.clientWidth - margin.left - margin.right
+    const height = chartDiv.clientHeight - margin.top - margin.bottom
     const chart = d3.select("#chart")
             .append("svg")
               .attr("width", width + margin.left + margin.right)
@@ -85,7 +90,11 @@
             .append("g")
               .attr("transform",
                     `translate(${margin.left}, ${margin.top})`);
-
+    const middle = width / 2;
+    const scale = width / P
+    const xScale = yScale = x => middle + x * scale               
+    const xCoord = pt => xScale(pt.x.sym())
+    const yCoord = pt => yScale(pt.y.sym())
     // Add lines
     let path
     const drawLines = pt => {
@@ -95,11 +104,11 @@
             .datum(Array.from(pt.generate()))
             .attr("fill", "none")
             .attr("stroke", "steelblue")
-            .attr("stroke-width", 1.5)
+            .attr("stroke-width", 0.05 * scale)
             .attr("d", d3.line()
-                .x(pt => 200 + pt.x.sym() * 30)
-                .y(pt => 200 + pt.y.sym() * 30)
-                )
+                .x(xCoord)
+                .y(yCoord)
+                ).lower()
     }
     // Add dots
     let G, dots;
@@ -107,6 +116,8 @@
         const {points, Point} = ec(a, b, P)
         if (typeof dots !== 'undefined')
                 dots.remove()
+        if (typeof path !== 'undefined')
+                path.remove()
         dots = chart.append('g')
             .selectAll('dot')
             .data(points)
@@ -115,9 +126,9 @@
             .attr("fill", "red")
             .attr("stroke", "black")
             .attr("stroke-width", 1.5)
-            .attr("cx", pt => 200 + pt.x.sym() * 30)
-            .attr("cy", pt => 200 + pt.y.sym() * 30)
-            .attr("r", 5)
+            .attr("cx", xCoord)
+            .attr("cy", yCoord)
+            .attr("r", .2 * scale)
             .on("click", function (pt) {
                 if (typeof G !== 'undefined')
                     G.attr("fill", "red")
