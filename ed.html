@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ED</title>
+</head>
+<style>
+    .singular {
+        color: red;
+    }
+    #chart {
+        border: 1pt solid black;
+        width: 90vw;
+        height: 90vw;
+        margin-left: auto;
+        margin-right: auto;
+    }
+    #div-curves {
+        text-align: center;
+    }
+    table {
+        margin-left: auto;
+        margin-right: auto;
+        font-size: 18pt;
+        font-family: sans-serif;
+        border-collapse: collapse;
+    }
+    th {
+        background-color: gray;
+        border: 1pt solid black;
+    }
+    td {
+        width: 2em;
+        height: 2em;
+        border: 1pt solid grey;
+    }
+</style>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<script src="ec.js"></script>
+
+<body>
+    <div id="div-eq">
+        <code style="font-size: 18pt">
+            x^2 + y^2 = β^2 (1 + α x^2 y^2) mod <span id="p">7</span><br>
+            α = <span id="a">1</span> β = <span id="b">6</span>
+            Δ = <span id="d">NYI</span>
+        </code>
+    </div>
+    <div id="div-curves">
+        <table id="curves"></table>
+    </div>
+    <div id="chart"></div>
+</body>
+
+<script>
+    const P = parseInt(document.querySelector("#p").innerText)
+    const valueA = document.querySelector("#a")
+    const valueB = document.querySelector("#b")
+    const valueDelta = document.querySelector("#d")
+    const setCurve = (a, b) => _ => {
+        valueA.innerText = a
+        valueB.innerText = b
+        drawCurve(a, b)
+    }
+    const table = document.querySelector("#curves")
+    const headRow = document.createElement('tr')
+    headRow.appendChild(document.createElement('td'))
+    for(let b = 0; b < P; ++b) {
+            const headB =  document.createElement('th')
+            headB.innerText = b;
+            headRow.appendChild(headB)
+    }
+    table.appendChild(headRow)
+    for(let a = 0; a < P; ++a) {
+        const row = document.createElement('tr')
+        const headA =  document.createElement('th')
+        headA.innerText = a
+        row.appendChild(headA)
+        for(let b = 0; b < P; ++b) {
+            const cell = document.createElement('td')
+            const curve = ed(a, b, P);
+            const cnt = curve.points.length;
+            if (cnt !== curve.points.length) {
+                console.error(`Points count mismatch for ec(${a}, ${b}):`
+                            + `${cnt} ≠ ${curve.points.length}`)
+            }
+            cell.innerText = cnt
+            cell.onclick = setCurve(a, b)
+            if (curve.discriminant.n === 0) {
+                cell.classList.add('singular')
+            }
+            row.appendChild(cell)
+        }
+        table.appendChild(row)
+    }
+    const chartDiv = document.querySelector("#chart")
+    const margin = {top: 10, right: 10, bottom: 10, left: 10}
+    const width = chartDiv.clientWidth - margin.left - margin.right
+    const height = chartDiv.clientHeight - margin.top - margin.bottom
+    const chart = d3.select("#chart")
+            .append("svg")
+              .attr("width", width + margin.left + margin.right)
+              .attr("height", height + margin.top + margin.bottom)
+            .append("g")
+              .attr("transform",
+                    `translate(${margin.left}, ${margin.top})`);
+    const middle = width / 2;
+    const scale = width / P
+    const xScale = yScale = x => middle + x * scale               
+    const xCoord = pt => xScale(pt.x.sym())
+    const yCoord = pt => yScale(pt.y.sym())
+    // Add lines
+    let path
+    const drawLines = pt => {
+        if (typeof path !== 'undefined')
+                path.remove()
+        path = chart.append("path")
+            .datum(Array.from(pt.generate()))
+            .attr("fill", "none")
+            .attr("stroke", "steelblue")
+            .attr("stroke-width", 0.05 * scale)
+            .attr("d", d3.line()
+                .x(xCoord)
+                .y(yCoord)
+                ).lower()
+    }
+    // Add dots
+    let G, dots;
+    const drawCurve = (a, b) => {
+        const {points, Point, discriminant} = ed(a, b, P)
+        valueDelta.innerText = discriminant.n
+        if (typeof dots !== 'undefined')
+                dots.remove()
+        if (typeof path !== 'undefined')
+                path.remove()
+        dots = chart.append('g')
+            .selectAll('dot')
+            .data(points)
+            .enter()
+            .append("circle")
+            .attr("fill", "red")
+            .attr("stroke", "black")
+            .attr("stroke-width", 1.5)
+            .attr("cx", xCoord)
+            .attr("cy", yCoord)
+            .attr("r", .2 * scale)
+            .on("click", function (pt) {
+                if (typeof G !== 'undefined')
+                    G.attr("fill", "red")
+                G = d3.select(this)
+                .attr("fill", "yellow")
+                drawLines(pt)
+            })
+    }
+    drawCurve(parseInt(valueA.innerText), parseInt(valueB.innerText))
+</script>
+</html>

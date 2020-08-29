@@ -109,6 +109,30 @@ const ec = (a, b, p) => {
     return {Point, count, points, discriminant}
 }
 
+
+const ed = (a, b, p) => {
+    const G = gf(p)
+    function Point (x, y) {
+        this.x = typeof x === 'number' ? new G(x) : x
+        this.y = typeof y === 'number' ? new G(y) : y
+    }
+    Point.prototype.onCurve = function () {
+        const {x, y} = this
+        const lhs = x.pow(2).add(y.pow(2))
+        const rhs = x.pow(2).mul(y.pow(2)).mul(a).add(1).mul(b).mul(b)
+        return lhs.n === rhs.n
+    }
+    const points = []
+    for (let i = 0; i < p; ++i) {
+        for (let j = 0; j < p; ++j) {
+            const pt = new Point(i, j)
+            if (pt.onCurve())
+                points.push(pt)
+        }
+    }
+    const discriminant = 0
+    return {Point, points, discriminant}
+}
 // const {Point:Pt, points:ps} = ec(0, 3, 7); a = new Pt(1, 2); b = new Pt(2, 2)
 // c = a.add(b)
 // console.log(c)
