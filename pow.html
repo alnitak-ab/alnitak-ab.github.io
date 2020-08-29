@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Powers</title>
+</head>
+<script src="https://d3js.org/d3.v4.min.js"></script>
+<body>
+    <div id="chart"></div>
+</body>
+<script>
+const P = 13
+const width = 300
+const height = 300
+const radius = 100
+const points = []
+
+const point = i => {
+    const phi = Math.PI / 2 + (2 * Math.PI / P) * i
+    return {i: i, x: radius * Math.cos(phi), y: radius * Math.sin(phi)}
+}
+for (let i = 0; i < P; i++) {
+    points.push(point(i))
+}
+const scale = x => width / 2 + x
+const xCoord = pt => scale(pt.x)
+const yCoord = pt => height - scale(pt.y)
+const chart = d3.select("#chart")
+            .append("svg")
+              .attr("width", width)
+              .attr("height", height)
+            .append("g")
+chart.append('g')
+            .selectAll('dot')
+            .data(points)
+            .enter()
+            .append("circle")
+            .attr("fill", "red")
+            .attr("stroke", "black")
+            .attr("stroke-width", 1.5)
+            .attr("cx", xCoord)
+            .attr("cy", yCoord)
+            .attr("r", 5)
+            .on("click", function (pt) {
+                if (typeof G !== 'undefined')
+                    G.attr("fill", "red")
+                G = d3.select(this)
+                .attr("fill", "yellow")
+                drawLines(pt.i)
+            })
+const powers = i => {
+    const pws = []
+    let j = i
+    do {
+        pws.push(j)
+        j = j * i % P
+    } while (j !== i)
+    pws.push(j)
+    return pws
+}
+let path
+const drawLines = i => {
+        if (typeof path !== 'undefined')
+                path.remove()
+        path = chart.append("path")
+            .datum(powers(i).map(point))
+            .attr("fill", "none")
+            .attr("stroke", "steelblue")
+            .attr("stroke-width", 3)
+            .attr("d", d3.line()
+                .x(xCoord)
+                .y(yCoord)
+                ).lower()
+    }
+</script>
+</html>
+
