@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html><head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <title>GF(7)</title>
+    <script type="text/javascript">
+
+var fragmentShaderCode=
+'varying mediump vec4 forward_color;'+
+'void main(void) {'+
+'  gl_FragColor = forward_color;'+
+'}';
+
+var vertexShaderCode=
+'attribute vec4 ppos;'+
+'varying mediump vec4 forward_color;'+
+'uniform mat4 mvp;'+
+'uniform float u_pal[4 * 7];'+
+'void main(void) {'+
+'  gl_Position = mvp * vec4(ppos.x, ppos.y, ppos.z, 1.0);'+
+'  gl_PointSize = 3.0;'+
+'  int cx = int(floor(ppos.a));'+
+'  if(cx==0)forward_color = vec4( 0.843137264251709, 0.1882352977991104, 0.15294118225574493, 1);'+
+'  else if(cx==1)forward_color = vec4( 0.9882352948188782, 0.5529412031173706, 0.3490196168422699, 1);'+
+'  else if(cx==2)forward_color = vec4( 0.9960784316062927, 0.8784313797950745, 0.5647059082984924, 1);'+
+'  else if(cx==3)forward_color = vec4(  1, 1, 0.7490196228027344, 1);'+
+'  else if(cx==4)forward_color = vec4(  0.8784313797950745, 0.9529411792755127, 0.9725490212440491, 1);'+
+'  else if(cx==5)forward_color = vec4(  0.5686274766921997, 0.7490196228027344, 0.8588235378265381, 1);'+
+'  else if(cx==6)forward_color = vec4(  0.2705882489681244, 0.4588235318660736, 0.7058823704719543, 1);'+
+//'  forward_color = vec4( u_pal[cx], u_pal[cx+1], u_pal[cx+2], 0.5);'+
+'}';
+
+// Global variables
+//-----------------
+var gl = null;       // GL context
+var program;         // The program object used in the GL context
+var running = true;  // True when the canvas is periodically refreshed
+var aspectRatio;     // Aspect ratio of the canvas used to correct the X/Y distortion 
+var vertices;
+var speed=2;
+var colors = [
+  215,48,39,
+  252,141,89,
+  254,224,144,
+  255,255,191,
+  224,243,248,
+  145,191,219,
+  69,117,180];
+
+// Function called by onload handler
+function start()
+{
+  // Gets canvas from the HTML page
+  var canvas = document.getElementById('glcanvas');
+
+  // Creates GL context
+  try {gl = canvas.getContext('experimental-webgl');}
+  catch(e) {alert('Exception catched in getContext: '+e.toString());return;}
+  
+  // If no exception but context creation failed, alerts user
+  if(!gl) {alert('Unable to create Web GL context');return;}
+  
+  gl.enable(gl.DEPTH_TEST);
+
+  //---------------- end of part 1 -----------------
+  
+  // Creates fragment shader (returns white color for any position)
+  var fshader = gl.createShader(gl.FRAGMENT_SHADER);
+  gl.shaderSource(fshader, fragmentShaderCode);
+  gl.compileShader(fshader);
+  if (!gl.getShaderParameter(fshader, gl.COMPILE_STATUS)) 
+  {alert('Error during fragment shader compilation:\n' + gl.getShaderInfoLog(fshader)); return;}
+
+  // Creates vertex shader (converts 2D point position to coordinates)
+  var vshader = gl.createShader(gl.VERTEX_SHADER);
+  gl.shaderSource(vshader, vertexShaderCode);
+  gl.compileShader(vshader);
+  if (!gl.getShaderParameter(vshader, gl.COMPILE_STATUS)) 
+  {alert('Error during vertex shader compilation:\n' + gl.getShaderInfoLog(vshader)); return;}
+
+  // Creates program and links shaders to it
+  program = gl.createProgram();
+  gl.attachShader(program, fshader);
+  gl.attachShader(program, vshader);
+  gl.linkProgram(program);
+  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) 
+  {alert('Error during program linking:\n' + gl.getProgramInfoLog(program));return;}
+
+  // Validates and uses program in the GL context
+  gl.validateProgram(program);
+  if (!gl.getProgramParameter(program, gl.VALIDATE_STATUS)) 
+  {alert('Error during program validation:\n' + gl.getProgramInfoLog(program));return;}
+  gl.useProgram(program);
+
+  updateObject();
+    
+  aspectRatio = canvas.width / canvas.height;
+  
+  setInterval("draw();", 40);  //40 ms
+}
+
+// Updates object with global parameters
+function updateObject()
+{ 
+  // Gets the torus factor from the HTML page
+  var interleave = parseFloat(document.getElementById('interleave').value);
+  var numsegs = parseFloat(document.getElementById('numsegs').value);
+  var numssegs = parseFloat(document.getElementById('numssegs').value);
+  var sradius = parseFloat(document.getElementById('sradius').value);
+
+  // Creates the object in "vertices"
+  makeTorus(0.7, sradius, numsegs, numssegs, interleave);
+
+  // Gets address of the input 'attribute' of the vertex shader
+  var vattrib = gl.getAttribLocation(program, 'ppos');
+  if(vattrib == -1)
+   {alert('Error during attribute address retrieval');return;}
+  gl.enableVertexAttribArray(vattrib);
+
+  // Initializes the vertex buffer and sets it as current one
+  var vbuffer = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, vbuffer);
+
+  // Puts vertices to buffer and links it to attribute variable 'ppos'
+  gl.bufferData(gl.ARRAY_BUFFER, vertices, gl.STATIC_DRAW);
+  gl.vertexAttribPointer(vattrib, 4, gl.FLOAT, false, 0, 0);
+
+}
+
+// Function called periodically to draw the scene
+function draw()
+{
+  // Tests if canvas should be refreshed
+  if(!running || !gl)
+    return;
+    
+  // Gets control value angles from HTML page via DOM
+  var ax = parseInt(document.getElementById('ax').innerHTML, 10);
+  var ay = parseInt(document.getElementById('ay').innerHTML, 10);
+  var az = parseInt(document.getElementById('az').innerHTML, 10);
+  
+  // Use increments via DOM to update angles (still in degrees)
+  ax = (ax + parseInt(document.getElementById('dx').value, 10) + 360) % 360;
+  ay = (ay + parseInt(document.getElementById('dy').value, 10) + 360) % 360;
+  az = (az + parseInt(document.getElementById('dz').value, 10) + 360) % 360;
+  
+  // Update HTML page with new values
+  document.getElementById('ax').innerHTML = ax.toString();
+  document.getElementById('ay').innerHTML = ay.toString();
+  document.getElementById('az').innerHTML = az.toString();
+  
+  // Convert values to radians
+  let rad = speed*Math.PI/360;
+  ax *= rad; ay *= rad; az *= rad; 
+
+  // Gets ox, oy, oz, s, d from the HTML form
+  var ox = parseFloat(document.getElementById('ox').value);
+  var oy = parseFloat(document.getElementById('oy').value);
+  var oz = parseFloat(document.getElementById('oz').value);
+  var s = parseFloat(document.getElementById('s').value);
+  var d = parseFloat(document.getElementById('d').value);
+  var f = parseFloat(document.getElementById('f').value);
+  var n = parseFloat(document.getElementById('n').value);
+  var exz = document.getElementById('exz').checked;
+
+  // Gets reference on the "uniform" 4x4 matrix transforming coordinates
+  var amvp = gl.getUniformLocation(program, "mvp");
+  if(amvp == -1)
+  {alert('Error during uniform address retrieval');running=false;return;}  
+
+  var pal = gl.getUniformLocation(program, "u_pal");
+  if(pal == -1)
+  {alert('Error during uniform address retrieval');running=false;return;}  
+
+  var clr=[],dv=255;
+  for(var i = 0;i<colors.length;i=i+3){
+    clr.push(colors[i]/dv)
+    clr.push(colors[i+1]/dv)
+    clr.push(colors[i+2]/dv)
+    clr.push(1);
+  }
+  //console.log(new Float32Array(clr));
+  //gl.uniform4fv(pal, false, new Float32Array(clr));
+
+  // Creates matrix using rotation angles
+  var mat = getTransformationMatrix(ox, oy, oz, ax, ay, az, s, d, f, n, aspectRatio, exz);
+  
+  // Sets the model-view-projections matrix in the shader
+  gl.uniformMatrix4fv(amvp, false, mat);
+
+  // Sets clear color to non-transparent dark blue and clears context
+  gl.clearColor(0.0, 0.0, 0.0, 1.0);
+  gl.clear(gl.COLOR_BUFFER_BIT);
+
+  //---------------------------- Changed in part 6 -------------
+
+  // Gets rendering parameter(s) from the HTML page
+  var rendering = document.getElementById('rendering').value;
+  var glrender = window.eval('gl.'+rendering);
+
+  // Draws the object
+  gl.drawArrays(glrender, 0, vertices.length/4);
+  gl.flush();
+}
+
+// Returns a transformation matrix as a flat array with 16 components, given:
+// ox, oy, oz: new origin (translation)
+// rx, ry, rz: rotation angles (radians)
+// s: scaling factor
+// d: distance between camera and origin after translation,
+//     if d <= -n skips projection completely
+// f: z coordinate of far plane (normally positive)
+// n: z coordinate of near plane (normally negative)
+// ar: aspect ratio of the viewport (e.g. 16/9)
+// exz: if true exchanges X and Z coords after projection
+function getTransformationMatrix(ox, oy, oz, rx, ry, rz, s, d, f, n, ar, exz)
+{
+  // Pre-computes trigonometric values
+  var cx = Math.cos(rx), sx = Math.sin(rx);
+  var cy = Math.cos(ry), sy = Math.sin(ry);
+  var cz = Math.cos(rz), sz = Math.sin(rz);
+
+  // Tests if d is too small, hence making perspective projection not possible
+  if (d <= -n)
+  {
+    // Transformation matrix without projection
+    return new Float32Array([
+      (cy*cz*s)/ar,cy*s*sz,-s*sy,0,
+      (s*(cz*sx*sy-cx*sz))/ar,s*(sx*sy*sz+cx*cz),cy*s*sx,0,
+      (s*(sx*sz+cx*cz*sy))/ar,s*(cx*sy*sz-cz*sx),cx*cy*s,0,
+      (s*(cz*((-oy*sx-cx*oz)*sy-cy*ox)-(oz*sx-cx*oy)*sz))/ar,
+      s*(((-oy*sx-cx*oz)*sy-cy*ox)*sz+cz*(oz*sx-cx*oy)),
+      s*(ox*sy+cy*(-oy*sx-cx*oz)),1    
+    ]);
+  }
+  else
+  {
+    // Pre-computes values determined with wxMaxima
+    var A=d;
+    var B=(n+f+2*d)/(f-n);
+    var C=-(d*(2*n+2*f)+2*f*n+2*d*d)/(f-n);
+    
+    // Tests if X and Z must be exchanged
+    if(!exz)
+    {
+      // Full transformation matrix
+      return new Float32Array([
+        (cy*cz*s*A)/ar,cy*s*sz*A,-s*sy*B,-s*sy,
+        (s*(cz*sx*sy-cx*sz)*A)/ar,s*(sx*sy*sz+cx*cz)*A,cy*s*sx*B,cy*s*sx,
+        (s*(sx*sz+cx*cz*sy)*A)/ar,s*(cx*sy*sz-cz*sx)*A,cx*cy*s*B,cx*cy*s,
+        (s*(cz*((-oy*sx-cx*oz)*sy-cy*ox)-(oz*sx-cx*oy)*sz)*A)/ar,
+        s*(((-oy*sx-cx*oz)*sy-cy*ox)*sz+cz*(oz*sx-cx*oy))*A,
+        C+(s*(ox*sy+cy*(-oy*sx-cx*oz))+d)*B,s*(ox*sy+cy*(-oy*sx-cx*oz))+d
+      ]);
+    }
+    else
+    {
+      // Full transformation matrix with XZ exchange
+      return new Float32Array([
+        -s*sy*B,cy*s*sz*A,(cy*cz*s*A)/ar,-s*sy,
+        cy*s*sx*B,s*(sx*sy*sz+cx*cz)*A,(s*(cz*sx*sy-cx*sz)*A)/ar,cy*s*sx,
+        cx*cy*s*B,s*(cx*sy*sz-cz*sx)*A,(s*(sx*sz+cx*cz*sy)*A)/ar,cx*cy*s,
+        C+(s*(ox*sy+cy*(-oy*sx-cx*oz))+d)*B,s*(((-oy*sx-cx*oz)*sy-cy*ox)*sz+cz*(oz*sx-cx*oy))*A,
+        (s*(cz*((-oy*sx-cx*oz)*sy-cy*ox)-(oz*sx-cx*oy)*sz)*A)/ar,s*(ox*sy+cy*(-oy*sx-cx*oz))+d
+      ]);
+    }
+  }
+}
+
+// Creates a 3D torus in the XY plane, returns the vertices in a Float32Array
+// r:  big radius
+// sr: section radius
+// n:  number of faces
+// sn: number of faces on section
+// k:  factor between 0 and 1 defining the space between strips of the torus
+function makeTorus(r, sr, n, sn, k)
+{
+  // Temporary arrays for the vertices and the normals
+  var tv = new Array();
+  var tc = new Array();
+  
+  // Iterates along the big circle and then around a section
+  for(var i=0;i<n;i++)
+    for(var j=0;j<sn+1*(i==n-1);j++)
+    {
+      // Pre-calculation of angles
+      var a =  2*Math.PI*(i+j/sn)/n;
+      var a2 = 2*Math.PI*(i+j/sn+k)/n;
+      var sa = 2*Math.PI*j/sn;
+
+      //console.log(i%sn);
+      
+      // Coordinates on the surface of the torus  
+      tv.push((r+sr*Math.cos(sa))*Math.cos(a)); // X
+      tv.push((r+sr*Math.cos(sa))*Math.sin(a)); // Y
+      tv.push(sr*Math.sin(sa));                 // Z
+      tv.push(i%sn);                            // cx
+
+     
+      // Second vertex to close triangle
+      tv.push((r+sr*Math.cos(sa))*Math.cos(a2)); // X
+      tv.push((r+sr*Math.cos(sa))*Math.sin(a2)); // Y
+      tv.push(sr*Math.sin(sa));                  // Z
+      tv.push(i%sn);                             // cx
+
+    }
+
+  // Converts and returns array
+  vertices = new Float32Array(tv);
+}
+
+    </script>
+  </head>
+
+  <body onload="start();">
+
+    <canvas id="glcanvas" width="640" height="480" onclick="running = !running;">
+       Your browser may not support HTML5
+    </canvas>
+
+    <p>
+      </p><div style="display:inline-block;">Mode in drawArrays:</div>
+      <div style="display:inline-block;">
+        <select id="rendering">
+          <option >TRIANGLE_STRIP</option><option>LINE_STRIP
+          </option><option selected="selected">POINTS</option><option>LINES</option><option>TRIANGLES</option><option>LINE_LOOP
+          </option><option>TRIANGLE_FAN
+        </option></select>
+      </div>      
+    <p></p>
+
+    <p>
+      </p><div style="display:inline-block;">Torus interleave:</div>
+      <div style="display:inline-block;">
+        <select id="interleave" onchange="updateObject();">
+          <option selected="selected">1.0</option><option>0.7</option><option>0.4</option><option>0.2
+        </option></select>
+      </div>
+      <div style="display:inline-block;padding-left:0.2em;">Section radius:</div>
+      <div style="display:inline-block;">
+        <select id="sradius" onchange="updateObject();">
+          <option selected="selected">0.2</option><option>0.3</option><option>0.7</option><option>0.9
+        </option></select>
+      </div>
+    <br>
+      <div style="display:inline-block;padding-left:0.2em;">#segments:</div>
+      <div style="display:inline-block;">
+        <select id="numsegs" onchange="updateObject();">
+          <option>3</option><option selected="selected">7</option><option>15</option><option>40
+        </option></select>
+      </div>
+      <div style="display:inline-block;padding-left:0.2em;">#segments in section:</div>
+      <div style="display:inline-block;">
+        <select id="numssegs" onchange="updateObject();">
+          <option>3</option><option selected="selected">7</option><option>15</option><option>40
+        </option></select>
+      </div>
+    <p></p>
+
+    <p>
+      </p><div style="display:inline-block;">OX:</div>
+      <div style="display:inline-block;">
+        <select id="ox">
+          <option>-1.0</option><option>-0.7</option><option>-0.3</option><option selected="selected">0
+          </option><option>+0.3</option><option>+0.7</option><option>+1.0
+        </option></select>
+      </div>
+      <div style="display:inline-block;padding-left:1em;">OY:</div>
+      <div style="display:inline-block;">
+        <select id="oy">
+          <option>-1.0</option><option>-0.7</option><option>-0.3</option><option selected="selected">0
+          </option><option>+0.3</option><option>+0.7</option><option>+1.0
+        </option></select>
+      </div>
+      <div style="display:inline-block;padding-left:1em;">OZ:</div>
+      <div style="display:inline-block;">
+        <select id="oz">
+          <option>-1.0</option><option>-0.7</option><option>-0.3</option><option selected="selected">0
+          </option><option>+0.3</option><option>+0.7</option><option>+1.0
+        </option></select>
+      </div>
+    <br>
+      <div style="display:inline-block;">RX:</div>
+      <div style="display:inline-block; width:1.5em;" id="ax">00</div>
+      <div style="display:inline-block;">
+        <select id="dx">
+          <option>-2</option><option>-1</option><option>0</option><option selected="selected">+1</option><option>+2
+        </option></select>
+      </div>
+      <div style="display:inline-block;padding-left:0.3em;">RY:</div>
+      <div style="display:inline-block; width:1.5em;" id="ay">0</div>
+      <div style="display:inline-block;">
+        <select id="dy">
+          <option>-2</option><option>-1</option><option>0</option><option>+1</option><option selected="selected">+1
+        </option></select>
+      </div>
+      <div style="display:inline-block;padding-left:0.3em;">RZ:</div>
+      <div style="display:inline-block; width:1.5em;" id="az">0</div>
+      <div style="display:inline-block;">
+        <select id="dz">
+          <option>-2</option><option>-1</option><option selected="selected">0</option><option>+1</option><option>+2
+        </option></select>
+      </div>
+    <br>
+      <div style="display:inline-block;">Scaling:</div>
+      <div style="display:inline-block;">
+        <select id="s">
+          <option>1.5</option><option>1.0</option><option selected="selected">0.7</option><option>0.5</option><option>0.3
+        </option></select>
+      </div>
+      <div style="display:inline-block;padding-left:1em;">Distance to camera:</div>
+      <div style="display:inline-block;">
+        <select id="d">
+          <option>0.5</option><option>1.1</option><option selected="selected">2.0
+          </option><option>5.0</option><option>100.0</option><option>-1.5
+        </option></select>
+      </div>
+    <p></p>
+
+    <p>
+      </p><div style="display:inline-block;">Near:</div>
+      <div style="display:inline-block;">
+        <select id="n">
+          <option>0.5</option><option>0.0</option><option>-0.5</option><option selected="selected">-1.0</option><option>-2.0
+        </option></select>
+      </div>
+      <div style="display:inline-block;padding-left:0.2em;">Far:</div>
+      <div style="display:inline-block;">
+        <select id="f">
+          <option>0.5</option><option selected="selected">1.0</option><option>2.5
+        </option></select>
+      </div>
+      <div style="display:inline-block;padding-left:0.2em;">
+        <input type="checkbox" id="exz">Exchange XZ
+      </div>
+    <p></p>
+
+
+  
+
+
+</body></html>
