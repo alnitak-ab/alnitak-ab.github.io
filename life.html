@@ -27,6 +27,9 @@
         input {
             width: 50%;
         }
+        #clr, #rnd, #run {
+            width: 16.6%
+        }
     </style>
     <title>Conway's game of life</title>
 </head>
@@ -39,7 +42,10 @@
                onchange='setspeed(this.value)'>
         <br><span class='label'><label for="scale">cells:</label></span>
         <input type="range" min="0" max="8" value="50" class="slider" id="cells">
-        <br><span class='label'></span> <input type="button" id="run" onclick="onoff()" value="run">
+        <br><span class='label'></span>
+        <input type="button" id="clr" onclick="doclear()" value="clear">
+        <input type="button" id="rnd" onclick="dorand()" value="random">
+        <input type="button" id="run" onclick="onoff()" value="run">
     </div>
 <script>
 const scale = 16 // Size of each cell in pixels (power of 2)
@@ -331,6 +337,16 @@ const onoff = () => {
     maxspeed()
     $('#run').value = stop ? "run" : "stop"
 }
+const dorand = () => {
+    setRandom(front)
+    show(front);
+    [back, front] = [front, back]
+}
+const doclear = () => {
+    setTexture(front)
+    show(front);
+    [back, front] = [front, back]    
+}
 document.onkeydown = ({code}) => {
     if (code == 'Space') 
         onoff()
@@ -342,16 +358,10 @@ document.onkeydown = ({code}) => {
         setdelay(t => min(t *= 1.5, 1000))
     else if (code == 'ArrowRight')
         dostep()
-    else if (code == 'KeyR') {
-        setRandom(front)
-        show(front);
-        [back, front] = [front, back]
-    }
-    else if (code == 'KeyC') {
-        setTexture(front)
-        show(front);
-        [back, front] = [front, back]
-    }
+    else if (code == 'KeyR')
+        dorand()
+    else if (code == 'KeyC')
+        doclear()
     else if (code == 'KeyF') {
         canvas.requestFullscreen()
     }
