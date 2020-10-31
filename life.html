@@ -1,6 +1,4 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
+<!DOCTYPE html><html lang="en"><head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
@@ -26,6 +24,9 @@
             width: 6ex;
             text-align: right;
         }
+        input {
+            width: 50%;
+        }
     </style>
     <title>Conway's game of life</title>
 </head>
@@ -38,6 +39,7 @@
                onchange='setspeed(this.value)'>
         <br><span class='label'><label for="scale">cells:</label></span>
         <input type="range" min="0" max="8" value="50" class="slider" id="cells">
+        <br><span class='label'></span> <input type="button" id="run" onclick="onoff()" value="run">
     </div>
 <script>
 const scale = 16 // Size of each cell in pixels (power of 2)
@@ -324,11 +326,14 @@ const wraponoff = () => {
 }
 const clamp = (x, min, max) => x < min ? min : x > max ? max : x
 const {min, max} = Math
+const onoff = () => {
+    stop = !stop
+    maxspeed()
+    $('#run').value = stop ? "run" : "stop"
+}
 document.onkeydown = ({code}) => {
-    if (code == 'Space') {
-        stop = !stop
-        maxspeed()
-    }
+    if (code == 'Space') 
+        onoff()
     else if (code == 'KeyW')
         wraponoff()
     else if (code == 'ArrowUp')
