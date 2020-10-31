@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* remove the border */
+        body {
+          border: 0;
+          margin: 0px;
+          font-size: x-large;
+          background-color: darkblue;
+          color: white;
+        }
+        canvas {
+          border: 0px solid red;
+          width: 100%;
+          display: block;
+          float: left;
+        }
+        h1 {
+            margin-left: 10px;
+        }
+        .label {
+            display: inline-block;
+            width: 6ex;
+            text-align: right;
+        }
+    </style>
+    <title>Conway's game of life</title>
+</head>
+<body>
+    <h1>Conway's game of life</h1>
+    <div id='fps'></div>
+    <div id='controls'>
+        <span class='label'><label for="speed">speed: </label></span>
+        <input type="range" min="0" max="60" value="30" class="slider" id="speed"
+               onchange='setspeed(this.value)'>
+        <br><span class='label'><label for="scale">cells:</label></span>
+        <input type="range" min="0" max="8" value="50" class="slider" id="cells">
+    </div>
+<script>
+const scale = 16 // Size of each cell in pixels (power of 2)
+const gap = 1   // Gap between the cells
+const cells = [128, 64]  // Field size in cells
+
+//////////////////// DOM ///////////////////
+const $ = x => document.querySelector(x)
+const $$ = (tag, attr={}) => {
+    const elt = document.createElement(tag)
+    for (const [name, value] of Object.entries(attr))
+        elt.setAttribute(name, value)
+    return elt
+}
+//////////////////// ico ///////////////////
+((width, height, pattern) => {
+    const ico = $$('canvas', {width, height})
+    const ctx = ico.getContext('2d')
+    ctx.fillStyle = 'grey'
+    ctx.fillRect(0, 0, width, height)
+    pattern.split('').forEach((c, k) => {
+        const [i, j] = [k % 3, Math.floor(k / 3)] 
+        ctx.fillStyle = c === 'o' ? 'white' : 'black'
+        ctx.fillRect(i * 5 + 1, j * 5 + 1, 4, 4)
+    })
+    $('head').appendChild($$('link', {
+        type: 'image/x-icon',
+        rel:'shortcut icon',
+        href:ico.toDataURL()
+    }))
+})(16, 16, '.o...oooo')
+//////////////////// GoL ///////////////////
+const canvas = $$('canvas', {
+    width: cells[0] * (scale + gap) + gap,
+    height: cells[1] * (scale + gap) + gap,
+})
+$('body').insertBefore(canvas, $('#fps'))
+const {width, height} = canvas
+const size = cells[0] * cells[1]
+
+const gl = canvas.getContext("webgl", {depth: false, alpha: false})
+gl.disable(gl.DEPTH_TEST)
+
+const shaders = Object.fromEntries(`
+-- xy:vertex
+attribute vec2 pos;
+void main() {
+    gl_Position = vec4(pos, 0, 1);
+}
+-- copy:fragment
+precision mediump float;
+uniform sampler2D state;
+uniform vec2 shape;
+uniform float gap, scale;
+
+void main() {
+    vec2 xy = gl_FragCoord.xy;
+    gl_FragColor = all(greaterThanEqual(mod(xy, float(${scale})+gap), vec2(gap))) ?
+         texture2D(state, xy / shape) : vec4(.1);
+}
+-- stamp:fragment
+precision mediump float;
+uniform sampler2D state, mask;
+uniform vec2 shape, cell;
+
+void main() {
+    vec2 xy = gl_FragCoord.xy;
+    float col = texture2D(state, xy / shape).r;
+    if (col == 0.)
+        col = texture2D(mask, (xy - cell) / 8.).r;
+    gl_FragColor = vec4(col);
+}
+-- step:fragment
+precision mediump float;
+uniform sampler2D state;
+uniform vec2 shape;
+
+float raw(int x, int y) {
+    vec2 xy = gl_FragCoord.xy + vec2(x, y);
+    return texture2D(state, xy  / shape).r;
+}
+
+float get(int x, int y) { return float(raw(x, y) == 1.);}
+
+void main() {
+    float sum =
+        get(-1, -1) + get(-1,  0) + get(-1,  1) +
+        get( 0, -1)               + get( 0,  1) +
+        get( 1, -1) + get( 1,  0) + get( 1,  1);
+    float color = raw(0, 0);
+    gl_FragColor = vec4(sum == 2. ? color :
+                        sum == 3. ? 1. : color - 0.1);
+}
+`.split('--').slice(1).map(chunk => {
+    const [info, ...source] = chunk.split('\n')
+    const [id, type] = info.trim().split(':')
+    const shader = gl.createShader(gl[`${type.toUpperCase()}_SHADER`])
+    gl.shaderSource(shader, source.join(''))
+    gl.compileShader(shader)
+    return [id, shader]
+}))
+
+Object.values(shaders).forEach(shader => {
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+        throw "could not compile shader:" + gl.getShaderInfoLog(shader)
+})
+
+const offscreen = gl.createFramebuffer()
+const [step, copy, stamp] = [
+    {
+        program: gl.createProgram(),
+        shape: cells,
+        shaderids: ['xy', 'step']
+    },
+    {
+        program: gl.createProgram(),
+        shape: [width, height],
+        shaderids: ['xy', 'copy']
+    },
+    {
+        program: gl.createProgram(),
+        shape: cells,
+        shaderids: ['xy', 'stamp']
+    }
+];
+
+[step, copy, stamp].forEach(({program, shaderids}) => {
+    shaderids.forEach(id => gl.attachShader(program, shaders[id]))
+    gl.linkProgram(program)
+});
+[step, copy, stamp].forEach(({program}) => {
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS))
+        throw "program failed to link:" + gl.getProgramInfoLog(program)
+})
+
+gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer())
+const quad = new Int8Array([-128, -128, 127, -128, -128, 127, 127, 127])
+gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW)
+
+// textures
+const setTexture = (tex, pixels, shape=step.shape) => {
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGB, ...shape,
+                  0, gl.RGB, gl.UNSIGNED_BYTE, pixels)
+}
+
+let [front, back] = [gl.createTexture(), gl.createTexture()].map(tex => {
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+    return tex
+})
+
+const setRandom = (tex, p=.3) => {
+    const bpp = 3
+    const pixels = new Uint8Array(size * bpp)
+    for (let i = 0; i < pixels.length; i += bpp)
+        pixels.fill(Math.random() < p ? 255 : 0, i, i + bpp)
+    setTexture(tex, pixels)
+};
+
+[step, copy, stamp].forEach(({program, shape}) => {
+    const posloc =  gl.getAttribLocation(program, 'pos'),
+          shapeloc = gl.getUniformLocation(program, 'shape')
+    gl.useProgram(program)
+    gl.enableVertexAttribArray(posloc)
+    gl.vertexAttribPointer(posloc, 2, gl.BYTE, false, 0, 0)
+    gl.uniform2fv(shapeloc, shape)
+})
+
+const run = (program, sources, target) => {
+    gl.useProgram(program)
+    if (target) {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, offscreen)
+        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+                                gl.TEXTURE_2D, target, 0)
+    }
+    else {
+        gl.bindFramebuffer(gl.FRAMEBUFFER, null) // onscreen
+        gl.uniform1f(gl.getUniformLocation(program, 'gap'), gap)
+    }
+    sources.forEach((source, i) => {
+        gl.activeTexture(gl.TEXTURE0 + i) 
+        gl.bindTexture(gl.TEXTURE_2D, source)
+    })
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+}
+
+const show = tex => run(copy.program, [tex])
+
+setTexture(back, null)
+setTexture(front, null)
+
+let stop = false
+let count = 0
+let start = Date.now(), now, delta
+let interval = parseInt(1000/$('#speed').value)
+const setspeed = speed => {
+    interval = 1000/parseInt(speed)
+}
+const maxspeed = () => {
+    if (!stop) {
+        requestAnimationFrame(maxspeed)
+        now = Date.now()
+        delta = now - start
+        if (delta > interval) {
+            start = now - (delta % interval)
+            dostep()
+        }
+    }
+}
+const fps = document.querySelector('#fps')
+
+setInterval(() => {
+    fps.innerText = `FPS: ${count}`
+    count = 0
+}, 1000)
+
+const stamptex = gl.createTexture()
+gl.bindTexture(gl.TEXTURE_2D, stamptex)
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE)
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE)
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST)
+gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST)
+
+const mkmask = (x, y, v) => {
+    const n = 8
+    const a = new Uint8Array(n * n * 3)
+    v.trim().split('\n').forEach((s, j) => {
+        s.split('').forEach((c, i) => {
+            const k = 3 * (n * (y + j) + x + i)
+            if (c === 'x')
+                a.fill(255, k, k + 3) 
+        })
+    })
+    return a
+}
+const flyer = mkmask(2, 2, `
+.x.
+..x
+xxx
+`)
+
+setTexture(stamptex, flyer, [8, 8])
+gl.useProgram(stamp.program)
+const cellloc = gl.getUniformLocation(stamp.program, 'cell')
+gl.uniform2fv(cellloc, [10, 20])
+gl.uniform1i(gl.getUniformLocation(stamp.program, 'state'), 0)
+gl.uniform1i(gl.getUniformLocation(stamp.program, 'mask'), 1)
+
+const dostep = () => {
+    run(step.program, [back], front)
+    show(front);
+    [back, front] = [front, back]
+    ++count
+}
+
+const [cellsx, cellsy] = cells
+const dostamp = (x, y) => {
+    let {width:w, height:h} = canvas.getBoundingClientRect()
+    if (document.fullscreenElement === canvas) {
+        y -= .5 * (h - .5 * w)
+        h = .5 * w
+    }
+    console.log(x, y, w, h)
+    gl.useProgram(stamp.program)
+    gl.uniform2f(cellloc, -2 + cellsx * x / w, -2 + cellsy * (h-y) / h)
+    console.log('cell',   -2 + cellsx * x / w, -2 + cellsy * (h-y) / h)
+    run(stamp.program, [back, stamptex], front)
+    show(front);
+    [back, front] = [front, back]
+}
+dostamp(400, 200)
+canvas.onclick = ({offsetX:x, offsetY:y}) => dostamp(x, y)
+
+let wrap = gl.REPEAT
+const wraponoff = () => {
+    wrap = wrap === gl.REPEAT ? gl.CLAMP_TO_EDGE : gl.REPEAT;
+    [front, back].map(tex => {
+        gl.bindTexture(gl.TEXTURE_2D, tex)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, wrap)
+        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, wrap)
+    })
+}
+const clamp = (x, min, max) => x < min ? min : x > max ? max : x
+const {min, max} = Math
+document.onkeydown = ({code}) => {
+    if (code == 'Space') {
+        stop = !stop
+        maxspeed()
+    }
+    else if (code == 'KeyW')
+        wraponoff()
+    else if (code == 'ArrowUp')
+        setdelay(t => max(t /= 1.5, 1 ))
+    else if (code == 'ArrowDown')
+        setdelay(t => min(t *= 1.5, 1000))
+    else if (code == 'ArrowRight')
+        dostep()
+    else if (code == 'KeyR') {
+        setRandom(front)
+        show(front);
+        [back, front] = [front, back]
+    }
+    else if (code == 'KeyC') {
+        setTexture(front)
+        show(front);
+        [back, front] = [front, back]
+    }
+    else if (code == 'KeyF') {
+        canvas.requestFullscreen()
+    }
+}
+</script>
+</body>
+</html>
