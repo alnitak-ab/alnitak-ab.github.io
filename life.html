@@ -215,7 +215,8 @@ const setRandom = (tex, p=.3) => {
     gl.vertexAttribPointer(posloc, 2, gl.BYTE, false, 0, 0)
     gl.uniform2fv(shapeloc, shape)
 })
-
+gl.useProgram(copy.program)
+gl.uniform1f(gl.getUniformLocation(copy.program, 'gap'), gap)
 const run = (program, sources, target) => {
     gl.useProgram(program)
     if (target) {
@@ -225,7 +226,7 @@ const run = (program, sources, target) => {
     }
     else {
         gl.bindFramebuffer(gl.FRAMEBUFFER, null) // onscreen
-        gl.uniform1f(gl.getUniformLocation(program, 'gap'), gap)
+        //gl.uniform1f(gl.getUniformLocation(program, 'gap'), gap)
     }
     sources.forEach((source, i) => {
         gl.activeTexture(gl.TEXTURE0 + i) 
