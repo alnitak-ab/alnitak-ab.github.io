@@ -35,13 +35,15 @@
 </head>
 <body>
     <h1>Conway's game of life</h1>
-    <div id='fps'></div>
+    
     <div id='controls'>
-        <span class='label'><label for="speed">speed: </label></span>
+        <span class='label'>FPS:</span>&nbsp;<span id='fps'>0</span>
+        <br><span class='label'><label for="speed">speed:</label></span>
         <input type="range" min="0" max="60" value="30" class="slider" id="speed"
                onchange='setspeed(this.value)'>
-        <br><span class='label'><label for="scale">cells:</label></span>
-        <input type="range" min="0" max="8" value="50" class="slider" id="cells">
+        <br><span class='label'><label for="fade">fade:</label></span>
+        <input type="range" min="1" max="20" value="10" class="slider" id="fade"
+               onchange='setfade(this.value)'>
         <br><span class='label'></span>
         <input type="button" id="clr" onclick="doclear()" value="clear">
         <input type="button" id="rnd" onclick="dorand()" value="random">
@@ -82,7 +84,7 @@ const canvas = $$('canvas', {
     width: cells[0] * (scale + gap) + gap,
     height: cells[1] * (scale + gap) + gap,
 })
-$('body').insertBefore(canvas, $('#fps'))
+$('body').insertBefore(canvas, $('#controls'))
 const {width, height} = canvas
 const size = cells[0] * cells[1]
 
@@ -122,6 +124,7 @@ void main() {
 precision mediump float;
 uniform sampler2D state;
 uniform vec2 shape;
+uniform float fade;
 
 float raw(int x, int y) {
     vec2 xy = gl_FragCoord.xy + vec2(x, y);
@@ -137,7 +140,7 @@ void main() {
         get( 1, -1) + get( 1,  0) + get( 1,  1);
     float color = raw(0, 0);
     gl_FragColor = vec4(sum == 2. ? color :
-                        sum == 3. ? 1. : color - 0.1);
+                        sum == 3. ? 1. : color - fade);
 }
 `.split('--').slice(1).map(chunk => {
     const [info, ...source] = chunk.split('\n')
@@ -218,27 +221,33 @@ const setRandom = (tex, p=.3) => {
 gl.useProgram(copy.program)
 gl.uniform1f(gl.getUniformLocation(copy.program, 'gap'), gap)
 const run = (program, sources, target) => {
-    gl.useProgram(program)
-    if (target) {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, offscreen)
-        gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
-                                gl.TEXTURE_2D, target, 0)
-    }
-    else {
-        gl.bindFramebuffer(gl.FRAMEBUFFER, null) // onscreen
-        //gl.uniform1f(gl.getUniformLocation(program, 'gap'), gap)
-    }
+    gl.bindFramebuffer(gl.FRAMEBUFFER, offscreen)
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0,
+                            gl.TEXTURE_2D, target, 0)
     sources.forEach((source, i) => {
         gl.activeTexture(gl.TEXTURE0 + i) 
         gl.bindTexture(gl.TEXTURE_2D, source)
     })
+    gl.useProgram(program)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
 }
-
-const show = tex => run(copy.program, [tex])
+const show = tex => {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null) // onscreen
+    gl.activeTexture(gl.TEXTURE0) 
+    gl.bindTexture(gl.TEXTURE_2D, tex)
+    gl.useProgram(copy.program)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)    
+}
 
 setTexture(back, null)
 setTexture(front, null)
+
+const setfade = fade => {
+    fade = parseFloat(fade)
+    gl.useProgram(step.program)
+    gl.uniform1f(gl.getUniformLocation(step.program, 'fade'), 1/fade)
+}
+setfade($('#fade').value)
 
 let stop = false
 let count = 0
@@ -261,7 +270,7 @@ const maxspeed = () => {
 const fps = document.querySelector('#fps')
 
 setInterval(() => {
-    fps.innerText = `FPS: ${count}`
+    fps.innerText = count
     count = 0
 }, 1000)
 
@@ -303,18 +312,14 @@ const dostep = () => {
     [back, front] = [front, back]
     ++count
 }
-
-const [cellsx, cellsy] = cells
 const dostamp = (x, y) => {
     let {width:w, height:h} = canvas.getBoundingClientRect()
     if (document.fullscreenElement === canvas) {
         y -= .5 * (h - .5 * w)
         h = .5 * w
     }
-    console.log(x, y, w, h)
     gl.useProgram(stamp.program)
-    gl.uniform2f(cellloc, -2 + cellsx * x / w, -2 + cellsy * (h-y) / h)
-    console.log('cell',   -2 + cellsx * x / w, -2 + cellsy * (h-y) / h)
+    gl.uniform2f(cellloc, -2 + cells[0] * x / w, -2 + cells[1] * (h-y) / h)
     run(stamp.program, [back, stamptex], front)
     show(front);
     [back, front] = [front, back]
@@ -348,25 +353,16 @@ const doclear = () => {
     show(front);
     [back, front] = [front, back]    
 }
-document.onkeydown = ({code}) => {
-    if (code == 'Space') 
-        onoff()
-    else if (code == 'KeyW')
-        wraponoff()
-    else if (code == 'ArrowUp')
-        setdelay(t => max(t /= 1.5, 1 ))
-    else if (code == 'ArrowDown')
-        setdelay(t => min(t *= 1.5, 1000))
-    else if (code == 'ArrowRight')
-        dostep()
-    else if (code == 'KeyR')
-        dorand()
-    else if (code == 'KeyC')
-        doclear()
-    else if (code == 'KeyF') {
-        canvas.requestFullscreen()
-    }
-}
+document.onkeydown = ({code}) => ({
+    Space: onoff,
+    ArrowUp: () => setdelay(t => max(t /= 1.5, 1 )),
+    ArrowDown: () => setdelay(t => min(t *= 1.5, 1000)),
+    ArrowRight: dostep,
+    KeyR: dorand,
+    KeyW: wraponoff,
+    KeyC: doclear,
+    KeyF: () => canvas.requestFullscreen()
+})[code]?.()
 </script>
 </body>
 </html>
