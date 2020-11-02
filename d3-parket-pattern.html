@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pythagorean parket</title>
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <style>
+        svg {
+            fill: none;
+            stroke-width: 1px;
+            stroke: black;
+            border: solid brown 2px;
+            background-color: cadetblue;
+        }
+        .a {
+            fill: orange;
+        }
+        #h {
+            fill: black;
+        }
+        #h:active {
+            fill: red;
+        }
+        #g {
+            stroke: none;
+            stroke-dasharray: 2px;
+        }
+        .grid {
+            stroke-dasharray: 2px;
+        }
+        #gh {
+            fill: black;
+        }
+        #gh:active {
+            fill: red;
+        }
+    </style>
+</head>
+<body>
+<svg></svg>
+<script>
+const [width, height] = [800, 800]
+const {sqrt, cos, sin, PI:π, atan} = Math
+const rad = π/180
+const [a, b] = [120, 160]
+const c = sqrt(a**2 + b**2)
+const svg = d3.select("svg").attr("width", width).attr("height", height)
+const pattern = svg.append('pattern').attr("id", "chair")
+    .attr('width', c).attr('height', c).attr('patternUnits', 'userSpaceOnUse')
+const [x1, y1] = [(a+b)*b/(2*c), (a+b)*a/(2*c)]
+
+const aSquare = pattern.append('rect')
+const cSquare = pattern.append('rect')
+const lines = pattern.append('path').attr('stroke', 'red')
+
+const update = phi => {
+    const [a, b] = [c*cos(phi*rad), c*sin(phi*rad)]
+    const [x1, y1] = [(a+b)*b/(2*c), (a+b)*a/(2*c)]
+    lines.attr('d', `M0 ${c/2}l${x1} ${y1}
+                M${c/2} 0l${-y1} ${x1}
+                M${c} ${c/2}l${-x1} ${-y1}
+                M${c/2} ${c}l${y1} ${-x1}`)
+    aSquare.attr('class', 'a').attr('width', a).attr('height', a)
+        .attr('transform', `translate(${c-x1}, ${c/2-y1})rotate(${90-phi})`)
+    cSquare.attr('width', c).attr('height', c)
+    handle.attr('cx', c*(1.5 + a/b)).attr('cy', 2*c)
+    guide.attr('d', `M${1.5*c} ${3*c}l${a*c/b} ${-c}`)
+}
+svg.append('rect')
+                    .attr('width', '100%').attr('height', '100%')
+        		    .attr('fill', 'url(#chair)')
+
+const xs = d3.range(0, width, c)
+const ys = d3.range(0, height, c)
+
+const vGrid = svg.selectAll().data(xs)
+    .join('path').attr('class', 'grid')
+const hGrid = svg.selectAll().data(ys)
+    .join('path').attr('class', 'grid')
+const guide = svg.append('path').attr('id', 'g')
+
+const gridHandle = svg.append('rect').attr('id', 'gh').attr('width', 10).attr('height', 10)
+    .call(d3.drag()
+      .on('start', ({subject}) => {
+          subject.active = true
+       })
+      .on("drag", e => gridUpdate(e.x, e.y))
+      .on("end", ({subject}) => {
+          subject.active = false
+      }))
+
+const gridUpdate = (hx, hy) => {
+    vGrid.attr('d', x=>`M${(x+hx) % width} 0l0 ${height}`)
+    hGrid.attr('d', y=>`M0 ${(y+hy) % height}l${width} 0`)
+    gridHandle.attr('x', hx).attr('y', hy)
+}
+
+const handle = svg.append('circle').attr('id', 'h').attr('r', 5)
+    .call(d3.drag()
+      .on('start', dragstarted)
+      .on("drag", dragged)
+      .on("end", dragended))
+const clamp = (x, min, max) => x > max ? max : x < min ? min : x
+function dragstarted({subject}) {
+    subject.active = true;
+    guide.attr('style', 'stroke:red')
+}
+
+function dragged(event) {
+    const x = clamp(event.x-1.5*c, 0, c)
+    const phi = atan(c/x)/rad
+    handle.attr('cx', event.x)
+    update(phi)
+}
+
+function dragended({subject}) {
+    subject.active = false;
+    guide.attr('style', 'stroke:none')
+}
+
+let start;
+function step(timestamp) {
+  if (start === undefined)
+    start = timestamp;
+  const elapsed = timestamp - start;
+  update(45 + 45 * sin(π/6+2*π*elapsed/4000)**2)
+  if (elapsed < 5000) { // Stop the animation after 2 seconds
+    window.requestAnimationFrame(step);
+  }
+}
+update(60)
+//window.requestAnimationFrame(step);
+</script>
+</body>
+</html>
