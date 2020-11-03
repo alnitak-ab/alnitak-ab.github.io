@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta charset="utf-8">
+        <title>euclid</title>
+        <style>
+            body {
+                background-color: rgb(220, 238, 170);
+                color: blue;
+            }
+            #x {
+                width: 990px;
+                height: 700px;
+                background-color: orange;
+                border: solid 3px blue;
+                position: relative;
+            }
+            #h {
+                background-color: #727272;
+                width: 10px;
+                height: 10px;
+                cursor: nwse-resize;
+                position: absolute;
+                right: 0;
+                bottom: 0;
+            }
+            h1 { 
+                text-align: left;
+                font-family: sans-serif;
+            }
+            #gcd {
+                 text-align: left;
+                 font-family: sans-serif;
+                 font-size: 40px;
+                 font-style: italic;
+            }
+        </style>
+    </head>
+    <h1>Euclidean algorithm</h1>
+    <p id="gcd">GCD(<span id="a">99</span>, <span id="b">70</span>) = <span id="r">1</span></p>
+    <div id="x">
+        <svg id="v"></svg>
+        <div id="h"></div>
+    </div>
+
+    <script>
+        const euc = (a, b) => {
+          const r = [a, b]
+          const q = []
+          let i = 2
+          do {
+            r[i] = r[i - 2] % r[i - 1]
+            q[i - 2] = (r[i - 2] - r[i]) / r[i - 1]
+          } while (r[i] && ++i)
+          return [r, q]
+        }
+        const [a, b] = [89, 55]
+        const svg = x => document.createElementNS('http://www.w3.org/2000/svg', x)
+        const [v, h, box, A, B, r] = ['v', 'h', 'x', 'a', 'b', 'r']
+          .map(x => document.getElementById(x))
+        const gcd = (a, b) => b === 0 ? a : a < b ? gcd(b, a) : gcd(b, a % b)
+
+        const show = (a, b) => {
+          A.innerText = a
+          B.innerText = b
+          r.innerText = gcd(a, b)
+        }
+
+        const resize = e => {
+          let w = e.clientX - box.offsetLeft; w -= w % 10
+          let h = e.clientY - box.offsetTop; h -= h % 10
+          box.style.width = w + 'px'
+          box.style.height = h + 'px'
+          const [a, b] = [w / 10, h / 10]
+          v.setAttribute('viewBox', `0 0 ${a} ${b}`)
+          clear()
+          draw(a, b)
+          show(a, b)
+        }
+
+        const stop = e => {
+          window.removeEventListener('mousemove', resize, false)
+          window.removeEventListener('mouseup', stop, false)
+        }
+
+        h.addEventListener('mousedown', e => {
+          window.addEventListener('mousemove', resize, false)
+          window.addEventListener('mouseup', stop, false)
+        }, false)
+
+        box.style.width = `${10 * a}px`
+        box.style.height = `${10 * b}px`
+        v.setAttribute('viewBox', `0 0 ${a} ${b}`)
+
+        const line = (x1, y1, x2, y2, color = 'blue') => {
+          const e = svg('line')
+          e.setAttribute('x1', x1)
+          e.setAttribute('y1', y1)
+          e.setAttribute('x2', x2)
+          e.setAttribute('y2', y2)
+          e.style.stroke = color
+          e.style.strokeWidth = '.3px'
+          v.appendChild(e)
+        }
+
+        const draw = (a, b) => {
+          const [r, q] = euc(a, b)
+          const dx = [1, 0, -1, 0]
+          const dy = [0, 1, 0, -1]
+          let x = 0
+          let y = 0
+          for (let i = 0; i < q.length; ++i) {
+            const [s, n] = [r[i + 1], q[i]]
+            for (let j = 1; j <= n; ++j) {
+              x += dx[i % 4] * s
+              y += dy[i % 4] * s
+              const x2 = x - dy[i % 4] * s
+              const y2 = y + dx[i % 4] * s
+              line(x, y, x2, y2)
+            }
+            x += dx[i % 4] * r[i + 2]
+            y += dy[i % 4] * r[i + 2]
+          }
+        }
+        draw(a, b)
+        show(a, b)
+        const clear = () => {
+          while (v.lastChild) {
+            v.removeChild(v.lastChild)
+          }
+        }
+    </script>
+</html>
