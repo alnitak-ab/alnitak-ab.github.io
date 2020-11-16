@@ -62,7 +62,9 @@
 
     // This creates a light, aiming 0,1,0 - to the sky (non-mesh)
     var light = new BABYLON.PointLight("light", new BABYLON.Vector3(20, 0, -6), scene);
-
+    light.diffuse = new BABYLON.Color3(1, .9, .5);
+    light.specular = new BABYLON.Color3(.1, .1, 0.05);
+    window.light = light;
     // Default intensity is 1. Let's dim the light a small amount
     // light.intensity = .7;
 
@@ -84,7 +86,7 @@
     shadowGenerator.useBlurExponentialShadowMap = true;
     //shadowGenerator.useBlurCloseExponentialShadowMap = true;
 
-    const screen = BABYLON.MeshBuilder.CreatePlane("myPlane", {width: 60, height: 30}, scene);
+    const screen = BABYLON.MeshBuilder.CreatePlane("screen", {width: 60, height: 30}, scene);
     screen.position.y = 0;
     screen.position.z = 6;
     screen.receiveShadows = true;
