@@ -62,8 +62,8 @@ lowp vec4 encode(highp float v) {
   highp float av = abs(v);
 
   // Handle special cases
-  if (av < FLOAT_MIN) // nan
-    return vec4(0);
+  if (v != v) // nan
+    return vec4(0x7f, 0xc0, 0, 0);
   if (v > FLOAT_MAX)  // +inf
     return vec4(127, 128, 0, 0) / 255.0;
   if(v < -FLOAT_MAX)  // -inf
@@ -142,11 +142,14 @@ const run = v => {
     const [format, type] =  [gl.RGBA, gl.UNSIGNED_BYTE]
     gl.readPixels(x, y, 1, 1, format, type, pixels)
 }
+const info = $$('pre')
 const input = $$('input', { width: 8 })
 const output = $$('pre', { width: 8})
+$('body').appendChild(info)
 $('body').appendChild(input)
 $('body').appendChild(output)
 
+info.innerText = gl.getParameter(gl.VERSION)
 
 const hexstr = v => v.reduce((x, y) => x + ' ' + y.toString(16).padStart(2, '0'), '').slice(1)
 const bytes = new Uint8Array(4)
