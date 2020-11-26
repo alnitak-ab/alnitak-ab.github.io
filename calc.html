@@ -148,7 +148,7 @@ $('body').appendChild(input)
 $('body').appendChild(output)
 
 
-const hexstr = v => v.map(x => x.toString(16).padStart(2, '0')).join(':')
+const hexstr = v => v.reduce((x, y) => x + ' ' + y.toString(16).padStart(2, '0'), '').slice(1)
 const bytes = new Uint8Array(4)
 const floats = new Float32Array(bytes.buffer)
 const encode = x => {
