@@ -92,7 +92,7 @@ lowp vec4 encode(highp float v) {
   c[1] += floor(ebias) * 128.0; 
 
   // Unpack sign bit
-  c[0] += 128.0 * step(0.0, -v);
+  c[0] += 64.0 * (1.0 - sign(v));
 
   // Scale back to range
   return c / 255.0;
