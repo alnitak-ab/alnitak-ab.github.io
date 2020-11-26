@@ -1,0 +1,165 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        canvas {
+            background-color: black;
+            border: solid 0px black;
+            width: 100%;
+        }
+    </style>
+    <title>GPU Calculator</title>
+</head>
+<body>
+<script>
+const $ = x => document.querySelector(x)
+const $$ = (tag, attr={}) => {
+    const elt = document.createElement(tag)
+    for (const [name, value] of Object.entries(attr))
+        elt.setAttribute(name, value)
+    return elt
+}
+//////////////////// ico ///////////////////
+((x, w, h, f) => {
+    const ico = $$('canvas', {width: w, height: h})
+    const ctx = ico.getContext('2d')
+    ctx.fillStyle = "orange"
+    ctx.beginPath()
+    ctx.arc(.5 * w, .5 * h, .5 * w, 0, 2 * Math.PI, true)
+    ctx.fill()
+    ctx.textAlign = 'center'
+    ctx.font = `${f}pt sans-serif`
+    ctx.fillStyle = "black"
+    ctx.fillText(x, .5 * w, .4 * (h + f))
+    $('head').appendChild($$('link', {
+        type: 'image/x-icon',
+        rel: 'shortcut icon',
+        href: ico.toDataURL()
+    }))
+})('±', 64, 64, 48)
+///////////////////////////////////////////////
+</script>
+<script>
+const canvas = $$('canvas', {width: 2, height: 1})
+const {width, height} = canvas
+//////////////////// 3d ///////////////////
+const gl = canvas.getContext('webgl');
+gl.viewport(0, 0, width, height)
+const shaders = `
+attribute vec2 pos;
+void main() {
+    gl_Position = vec4(pos, 0, 1);
+}
+––
+precision mediump float;
+uniform highp float x;
+#define FLOAT_MAX  1.70141184e38
+#define FLOAT_MIN  1.17549435e-38
+
+lowp vec4 encode(highp float v) {
+  highp float av = abs(v);
+
+  // Handle special cases
+  if (av < FLOAT_MIN) // nan
+    return vec4(0);
+  if (v > FLOAT_MAX)  // +inf
+    return vec4(127, 128, 0, 0) / 255.0;
+  if(v < -FLOAT_MAX)  // -inf
+    return vec4(255, 128, 0, 0) / 255.0;
+
+  highp vec4 c = vec4(0);
+
+  // Compute exponent and mantissa
+  highp float e = floor(log2(av)), m = av * exp2(-e) - 1.0;
+  
+  // Unpack mantissa
+  c[1] = floor(128.0 * m);
+  m -= c[1] / 128.0;
+  c[2] = floor(32768.0 * m);
+  m -= c[2] / 32768.0;
+  c[3] = floor(8388608.0 * m);
+  
+  // Unpack exponent
+  highp float ebias = e + 127.0;
+  c[0] = floor(ebias / 2.0);
+  ebias -= c[0] * 2.0;
+  c[1] += floor(ebias) * 128.0; 
+
+  // Unpack sign bit
+  c[0] += 128.0 * step(0.0, -v);
+
+  // Scale back to range
+  return c / 255.0;
+}
+
+void main() {
+    gl_FragColor = encode(x);
+}
+`.split('––').map((source, i) => {
+    const types = [gl.VERTEX_SHADER, gl.FRAGMENT_SHADER]
+    const shader = gl.createShader(types[i])
+    gl.shaderSource(shader, source)
+    gl.compileShader(shader)
+    return shader
+}).map(shader => {
+    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+        throw "could not compile shader:" + gl.getShaderInfoLog(shader)
+    return shader
+})
+
+const program = gl.createProgram()
+shaders.forEach(shader => gl.attachShader(program, shader))
+gl.linkProgram(program)
+if (!gl.getProgramParameter(program, gl.LINK_STATUS))
+    throw "program failed to link:" + gl.getProgramInfoLog(program)
+
+
+gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer())
+const rect = new Float32Array([
+    -1, -1,   //   2 -- 3
+    1, -1,    //   | \  |
+    -1, 1,    //   |  \ |
+    1, 1      //   0 -- 1
+]).map(x => 1 * x)
+gl.bufferData(gl.ARRAY_BUFFER, rect, gl.STATIC_DRAW)
+
+{
+    const posloc =  gl.getAttribLocation(program, 'pos')
+    gl.enableVertexAttribArray(posloc)
+    gl.vertexAttribPointer(posloc, 2, gl.FLOAT, false, 0, 0);
+}
+
+const pixels = new Uint8Array(4)
+const num = new Float32Array(pixels.buffer)
+const xloc =  gl.getUniformLocation(program, 'x')
+gl.useProgram(program)
+const run = v => {
+    gl.uniform1f(xloc, v)
+    gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
+    const [x, y] = [0, 0]
+    const [format, type] =  [gl.RGBA, gl.UNSIGNED_BYTE]
+    gl.readPixels(x, y, 1, 1, format, type, pixels)
+}
+const input = $$('input', { width: 8 })
+const output = $$('pre', { width: 8})
+$('body').appendChild(input)
+$('body').appendChild(output)
+
+
+const hexstr = v => v.map(x => x.toString(16).padStart(2, '0')).join(':')
+const bytes = new Uint8Array(4)
+const floats = new Float32Array(bytes.buffer)
+const encode = x => {
+    floats[0] = x
+    return bytes.reverse()
+}
+input.oninput = function () {
+    const v = parseFloat(this.value)
+    run(v)
+    output.innerText = hexstr(pixels) + ' = ' + hexstr(encode(v))
+}
+</script>
+</body>
+</html>
