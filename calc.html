@@ -13,6 +13,9 @@
     <title>GPU Calculator</title>
 </head>
 <body>
+    <pre id='info'></pre>
+    <div>x = <input id='x' width='8'> </div>
+    <div>y = <input id='y' width='8' value='x'> </div>
 <script>
 const $ = x => document.querySelector(x)
 const $$ = (tag, attr={}) => {
@@ -47,78 +50,84 @@ const {width, height} = canvas
 //////////////////// 3d ///////////////////
 const gl = canvas.getContext('webgl');
 gl.viewport(0, 0, width, height)
-const shaders = `
-attribute vec2 pos;
-void main() {
-    gl_Position = vec4(pos, 0, 1);
+const makeProgram = (expr) => {
+    const shaders = `
+    attribute vec2 pos;
+    void main() {
+        gl_Position = vec4(pos, 0, 1);
+    }
+    ––
+    precision mediump float;
+    uniform highp float x;
+    #define FLOAT_MAX  1.70141184e38
+    #define FLOAT_MIN  1.17549435e-38
+
+    bool isnan( float val )
+    {
+    return !( val < 0.0 || 0.0 < val || val == 0.0 );
+    }
+    lowp vec4 encode(highp float v) {
+    highp float av = abs(v);
+
+    // Handle special cases
+    if (isnan(v)) // nan
+        return vec4(0x7f, 0xc0, 0, 0) / 255.0;
+    if (v > FLOAT_MAX)  // +inf
+        return vec4(127, 128, 0, 0) / 255.0;
+    if(v < -FLOAT_MAX)  // -inf
+        return vec4(255, 128, 0, 0) / 255.0;
+
+    highp vec4 c = vec4(0);
+
+    // Compute exponent and mantissa
+    highp float e = floor(log2(av)), m = av * exp2(-e) - 1.0;
+    
+    // Unpack mantissa
+    c[1] = floor(128.0 * m);
+    m -= c[1] / 128.0;
+    c[2] = floor(32768.0 * m);
+    m -= c[2] / 32768.0;
+    c[3] = floor(8388608.0 * m);
+    
+    // Unpack exponent
+    highp float ebias = e + 127.0;
+    c[0] = floor(ebias / 2.0);
+    ebias -= c[0] * 2.0;
+    c[1] += floor(ebias) * 128.0; 
+
+    // Unpack sign bit
+    c[0] += 64.0 * (1.0 - sign(v));
+
+    // Scale back to range
+    return c / 255.0;
+    }
+
+    void main() {
+        highp float y = float(${expr});
+        gl_FragColor = encode(y);
+    }
+    `.split('––').map((source, i) => {
+        const types = [gl.VERTEX_SHADER, gl.FRAGMENT_SHADER]
+        const shader = gl.createShader(types[i])
+        gl.shaderSource(shader, source)
+        gl.compileShader(shader)
+        return shader
+    }).map(shader => {
+        if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+            throw "could not compile shader:" + gl.getShaderInfoLog(shader)
+        return shader
+    })
+
+    const program = gl.createProgram()
+    shaders.forEach(shader => gl.attachShader(program, shader))
+    gl.linkProgram(program)
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS))
+        throw "program failed to link:" + gl.getProgramInfoLog(program)
+    const posloc =  gl.getAttribLocation(program, 'pos')
+    gl.enableVertexAttribArray(posloc)
+    gl.vertexAttribPointer(posloc, 2, gl.FLOAT, false, 0, 0);
+    return program
 }
-––
-precision mediump float;
-uniform highp float x;
-#define FLOAT_MAX  1.70141184e38
-#define FLOAT_MIN  1.17549435e-38
-
-bool isnan( float val )
-{
-  return !( val < 0.0 || 0.0 < val || val == 0.0 );
-}
-lowp vec4 encode(highp float v) {
-  highp float av = abs(v);
-
-  // Handle special cases
-  if (isnan(v)) // nan
-    return vec4(0x7f, 0xc0, 0, 0) / 255.0;
-  if (v > FLOAT_MAX)  // +inf
-    return vec4(127, 128, 0, 0) / 255.0;
-  if(v < -FLOAT_MAX)  // -inf
-    return vec4(255, 128, 0, 0) / 255.0;
-
-  highp vec4 c = vec4(0);
-
-  // Compute exponent and mantissa
-  highp float e = floor(log2(av)), m = av * exp2(-e) - 1.0;
-  
-  // Unpack mantissa
-  c[1] = floor(128.0 * m);
-  m -= c[1] / 128.0;
-  c[2] = floor(32768.0 * m);
-  m -= c[2] / 32768.0;
-  c[3] = floor(8388608.0 * m);
-  
-  // Unpack exponent
-  highp float ebias = e + 127.0;
-  c[0] = floor(ebias / 2.0);
-  ebias -= c[0] * 2.0;
-  c[1] += floor(ebias) * 128.0; 
-
-  // Unpack sign bit
-  c[0] += 64.0 * (1.0 - sign(v));
-
-  // Scale back to range
-  return c / 255.0;
-}
-
-void main() {
-    gl_FragColor = encode(x);
-}
-`.split('––').map((source, i) => {
-    const types = [gl.VERTEX_SHADER, gl.FRAGMENT_SHADER]
-    const shader = gl.createShader(types[i])
-    gl.shaderSource(shader, source)
-    gl.compileShader(shader)
-    return shader
-}).map(shader => {
-    if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
-        throw "could not compile shader:" + gl.getShaderInfoLog(shader)
-    return shader
-})
-
-const program = gl.createProgram()
-shaders.forEach(shader => gl.attachShader(program, shader))
-gl.linkProgram(program)
-if (!gl.getProgramParameter(program, gl.LINK_STATUS))
-    throw "program failed to link:" + gl.getProgramInfoLog(program)
-
 
 gl.bindBuffer(gl.ARRAY_BUFFER, gl.createBuffer())
 const rect = new Float32Array([
@@ -126,31 +135,26 @@ const rect = new Float32Array([
     1, -1,    //   | \  |
     -1, 1,    //   |  \ |
     1, 1      //   0 -- 1
-]).map(x => 1 * x)
+])
 gl.bufferData(gl.ARRAY_BUFFER, rect, gl.STATIC_DRAW)
 
-{
-    const posloc =  gl.getAttribLocation(program, 'pos')
-    gl.enableVertexAttribArray(posloc)
-    gl.vertexAttribPointer(posloc, 2, gl.FLOAT, false, 0, 0);
-}
 
 const pixels = new Uint8Array(4)
 const num = new Float32Array(pixels.buffer)
-const xloc =  gl.getUniformLocation(program, 'x')
-gl.useProgram(program)
-const run = v => {
-    gl.uniform1f(xloc, v)
+let xloc
+
+const run = () => {
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
     const [x, y] = [0, 0]
     const [format, type] =  [gl.RGBA, gl.UNSIGNED_BYTE]
     gl.readPixels(x, y, 1, 1, format, type, pixels)
+    output.innerText = decode(pixels)
 }
-const info = $$('pre')
-const input = $$('input', { width: 8 })
+
+const info = $('#info')
+const x = $('#x')
+const y = $('#y')
 const output = $$('pre', { width: 8})
-$('body').appendChild(info)
-$('body').appendChild(input)
 $('body').appendChild(output)
 
 info.innerText = gl.getParameter(gl.VERSION)
@@ -158,15 +162,25 @@ info.innerText = gl.getParameter(gl.VERSION)
 const hexstr = v => v.reduce((x, y) => x + ' ' + y.toString(16).padStart(2, '0'), '').slice(1)
 const bytes = new Uint8Array(4)
 const floats = new Float32Array(bytes.buffer)
-const encode = x => {
-    floats[0] = x
-    return bytes.reverse()
+const encode = x => { floats[0] = x; return bytes.reverse() }
+const decode = b => { bytes.set(b.reverse()); return floats[0] }
+
+y.oninput = function () {
+    try {
+        const program = makeProgram(this.value)
+        xloc =  gl.getUniformLocation(program, 'x')
+        gl.useProgram(program)
+        x.oninput()
+    } catch (e) {
+        output.innerText = e
+    }
 }
-input.oninput = function () {
+x.oninput = function () {
     const v = parseFloat(this.value)
-    run(v)
-    output.innerText = hexstr(pixels) + ' = ' + hexstr(encode(v))
+    gl.uniform1f(xloc, v)
+    run()
 }
+y.oninput()
 </script>
 </body>
 </html>
