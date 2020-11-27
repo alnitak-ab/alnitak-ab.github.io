@@ -48,7 +48,7 @@ const $$ = (tag, attr={}) => {
 const canvas = $$('canvas', {width: 2, height: 1})
 const {width, height} = canvas
 //////////////////// 3d ///////////////////
-const gl = canvas.getContext('webgl2');
+const gl = canvas.getContext('webgl2') || canvas.getContext('webgl');
 gl.viewport(0, 0, width, height)
 const makeProgram = (expr) => {
     const shaders = `
