@@ -14,7 +14,7 @@
 </head>
 <body>
     <pre id='info'></pre>
-    <div>x = <input id='x' width='8'> </div>
+    <div>x = <input id='x' width='8' value='42'> </div>
     <div>y = <input id='y' width='8' value='x'> </div>
 <script>
 const $ = x => document.querySelector(x)
@@ -48,7 +48,7 @@ const $$ = (tag, attr={}) => {
 const canvas = $$('canvas', {width: 2, height: 1})
 const {width, height} = canvas
 //////////////////// 3d ///////////////////
-const gl = canvas.getContext('webgl');
+const gl = canvas.getContext('webgl2');
 gl.viewport(0, 0, width, height)
 const makeProgram = (expr) => {
     const shaders = `
@@ -158,6 +158,12 @@ const output = $$('pre', { width: 8})
 $('body').appendChild(output)
 
 info.innerText = gl.getParameter(gl.VERSION)
+const rendererInfo = gl.getExtension('WEBGL_debug_renderer_info')
+if (rendererInfo) {
+    info.innerText += `
+Vendor: ${gl.getParameter(rendererInfo.UNMASKED_VENDOR_WEBGL)}
+Engine: ${gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL)}`
+}
 
 const hexstr = v => v.reduce((x, y) => x + ' ' + y.toString(16).padStart(2, '0'), '').slice(1)
 const bytes = new Uint8Array(4)
