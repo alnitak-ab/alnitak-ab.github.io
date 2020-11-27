@@ -158,11 +158,16 @@ const output = $$('pre', { width: 8})
 $('body').appendChild(output)
 
 info.innerText = gl.getParameter(gl.VERSION)
-const rendererInfo = gl.getExtension('WEBGL_debug_renderer_info')
-if (rendererInfo) {
-    info.innerText += `
+try {
+    const rendererInfo = gl.getExtension('WEBGL_debug_renderer_info')
+    if (rendererInfo) {
+        info.innerText += `
 Vendor: ${gl.getParameter(rendererInfo.UNMASKED_VENDOR_WEBGL)}
 Engine: ${gl.getParameter(rendererInfo.UNMASKED_RENDERER_WEBGL)}`
+    }
+}
+catch (e) {
+        info.innerText += e
 }
 
 const hexstr = v => v.reduce((x, y) => x + ' ' + y.toString(16).padStart(2, '0'), '').slice(1)
