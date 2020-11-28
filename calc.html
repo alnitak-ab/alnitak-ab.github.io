@@ -143,12 +143,12 @@ const pixels = new Uint8Array(4)
 const num = new Float32Array(pixels.buffer)
 let xloc
 
-const run = () => {
+const [format, type] =  [gl.RGBA, gl.UNSIGNED_BYTE]
+const eval = v => {
+    gl.uniform1f(xloc, v)
     gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4)
-    const [x, y] = [0, 0]
-    const [format, type] =  [gl.RGBA, gl.UNSIGNED_BYTE]
-    gl.readPixels(x, y, 1, 1, format, type, pixels)
-    output.innerText = decode(pixels)
+    gl.readPixels(0, 0, 1, 1, format, type, pixels)
+    return pixels
 }
 
 const info = $('#info')
@@ -188,10 +188,20 @@ y.oninput = function () {
 }
 x.oninput = function () {
     const v = parseFloat(this.value)
-    gl.uniform1f(xloc, v)
-    run()
+    output.innerText = decode(eval(v))
 }
 y.oninput()
+const assert = x => {if (!x) console.error('asertion failed')}
+assert(hexstr(eval(0)) == '00 00 00 00')
+assert(hexstr(eval(1)) == '3f 80 00 00')
+assert(hexstr(eval(-2)) == 'c0 00 00 00')
+assert(hexstr(eval(NaN)) == '7f c0 00 00')
+assert(hexstr(eval(Infinity)) == '7f 80 00 00')
+assert(hexstr(eval(-Infinity)) == 'ff 80 00 00')
+// assert(hexstr(eval(-0)) == '80 00 00 00')
+
+assert(hexstr(eval(decode([1, 2, 3, 4]))) == '01 02 03 04')
+assert(hexstr(eval(decode([0x12, 0x34, 0x56, 0x78]))) == '12 34 56 78')
 </script>
 </body>
 </html>
