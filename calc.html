@@ -93,10 +93,9 @@ lowp vec4 encode(highp float v) {
     c[3] = floor(8388608.0 * m);   // 2^23
     
     // Unpack exponent
-    highp float ebias = e + 127.0;
-    c[0] += floor(ebias / 2.0);
-    ebias -= c[0] * 2.0;
-    c[1] += floor(ebias) * 128.0; 
+    e += 127.0;
+    c[0] += floor(e / 2.0);
+    c[1] += mod(e, 2.0) * 128.0; 
 
     // Scale back to range
     return c / 255.0;
