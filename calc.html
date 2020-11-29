@@ -57,17 +57,17 @@ void main() {
     gl_Position = vec4(pos, 0, 1);
 }
 ––
-precision mediump float;
-uniform highp float x;
+precision highp float;
+uniform float x;
 #define FLOAT_MAX  1.70141184e38
 #define FLOAT_MIN  1.17549435e-38
 
-bool isnan( float val )
+bool isnan(float val )
 {
     return !( val < 0.0 || 0.0 < val || val == 0.0 );
 }
 
-lowp vec4 encode(highp float v) {
+lowp vec4 encode(float v) {
     // Handle special cases
     if (isnan(v)) // nan
         return vec4(0x7f, 0xc0, 0, 0) / 255.0;
@@ -76,14 +76,14 @@ lowp vec4 encode(highp float v) {
     if(v < -FLOAT_MAX)  // -inf
         return vec4(255, 128, 0, 0) / 255.0;
 
-    highp vec4 c = vec4(0);
+    vec4 c = vec4(0);
     if (v < 0.) {
         c[0] = 128.;   // Unpack sign bit
         v = -v;
     }
 
     // Compute exponent and mantissa
-    highp float e = floor(log2(v)), m = v * exp2(-e) - 1.0;
+    float e = floor(log2(v)), m = v * exp2(-e) - 1.0;
     
     // Unpack mantissa
     c[1] = floor(128.0 * m);       // 2^7
