@@ -59,8 +59,8 @@ void main() {
 ––
 precision highp float;
 uniform float x;
-#define FLOAT_MAX  1.70141184e38
-#define FLOAT_MIN  1.17549435e-38
+#define FLOAT_MAX  1.70141184e38   // 2^127
+#define FLOAT_MIN  1.17549435e-38  // 2^-126
 
 bool isnan(float val )
 {
@@ -91,7 +91,7 @@ lowp vec4 encode(float v) {
     c[2] = floor(32768.0 * m);     // 2^15
     m -= c[2] / 32768.0;
     c[3] = floor(8388608.0 * m);   // 2^23
-    
+    //c.yzw = mod(floor(m * vec3(128., 32768., 8388608.)), 256.);
     // Unpack exponent
     e += 127.0;
     c[0] += floor(e / 2.0);
@@ -203,6 +203,7 @@ assert(hexstr(eval(2**-125)) == '01 00 00 00')
 assert(hexstr(eval(2**-1)) == '3f 00 00 00')
 assert(hexstr(eval(2**127)) == '7f 00 00 00')
 // even powers of 2
+assert(hexstr(eval(2**128)) == '7f 80 00 00')
 assert(hexstr(eval(2**-126)) == '00 80 00 00')
 
 assert(hexstr(eval(decode([1, 2, 3, 4]))) == '01 02 03 04')
