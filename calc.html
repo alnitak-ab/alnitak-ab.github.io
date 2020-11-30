@@ -62,19 +62,16 @@ uniform float x;
 #define FLOAT_MAX  1.70141184e38   // 2^127
 #define FLOAT_MIN  1.17549435e-38  // 2^-126
 
-bool isnan(float val )
-{
-    return !( val < 0.0 || 0.0 < val || val == 0.0 );
-}
+bool isnan(float val ) { return val != val; }
 
 lowp vec4 encode(float v) {
     // Handle special cases
     if (isnan(v)) // nan
         return vec4(0x7f, 0xc0, 0, 0) / 255.0;
     if (v > FLOAT_MAX)  // +inf
-        return vec4(127, 128, 0, 0) / 255.0;
+        return vec4(0x7f, 0x80, 0, 0) / 255.0;
     if(v < -FLOAT_MAX)  // -inf
-        return vec4(255, 128, 0, 0) / 255.0;
+        return vec4(0xff, 0x80, 0, 0) / 255.0;
 
     vec4 c = vec4(0);
     if (v < 0.) {
