@@ -68,6 +68,8 @@ lowp vec4 encode(float v) {
     // Handle special cases
     if (isnan(v)) // nan
         return vec4(0x7f, 0xc0, 0, 0) / 255.0;
+    if (v == 0.0)  // +-0.0
+        return vec4(1./v < 0.0 ? 0x80 : 0, 0, 0, 0) / 255.0; 
     if (v > FLOAT_MAX)  // +inf
         return vec4(0x7f, 0x80, 0, 0) / 255.0;
     if(v < -FLOAT_MAX)  // -inf
@@ -183,12 +185,13 @@ y.oninput = function () {
     }
 }
 x.oninput = function () {
-    const v = parseFloat(this.value)
-    output.innerText = decode(eval(v))
+    const v = eval(+this.value)
+    output.innerText = decode(v).toLocaleString() + '\n' + hexstr(v.reverse())
 }
 y.oninput()
 const assert = x => {if (!x) console.error('asertion failed')}
 assert(hexstr(eval(0)) == '00 00 00 00')
+assert(hexstr(eval(-0)) == '80 00 00 00')
 assert(hexstr(eval(1)) == '3f 80 00 00')
 assert(hexstr(eval(-2)) == 'c0 00 00 00')
 assert(hexstr(eval(NaN)) == '7f c0 00 00')
