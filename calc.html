@@ -81,7 +81,7 @@ lowp vec4 encode(float v) {
     // Compute exponent and mantissa
     float e = floor(log2(v)), m = v * exp2(-e) - 1.0;
     
-    // Unpack mantissa
+    // Unpack mantissa: m = c[1] * 2^-7 + c[2] * 2^-15 + c[3] * 2^-23
     c[1] = floor(128.0 * m);       // 2^7
     m -= c[1] / 128.0;
     c[2] = floor(32768.0 * m);     // 2^15
