@@ -62,6 +62,7 @@ uniform float x;
 
 bool isnan(float val ) { return val != val; }
 
+// see https://github.com/mikolalysenko/glsl-read-float
 lowp vec4 encode(float v) {
     // Handle special cases
     if (isnan(v)) // nan
