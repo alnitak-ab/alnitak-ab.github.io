@@ -82,11 +82,9 @@ lowp vec4 encode(float v) {
     float e = floor(log2(v)), m = v * exp2(-e) - 1.0;
     
     // Unpack mantissa: m = c[1] * 2^-7 + c[2] * 2^-15 + c[3] * 2^-23
-    c[1] = floor(128.0 * m);       // 2^7
-    m -= c[1] / 128.0;
-    c[2] = floor(32768.0 * m);     // 2^15
-    m -= c[2] / 32768.0;
-    c[3] = 8388608.0 * m;          // 2^23
+    vec3 M = floor(m * vec3(128, 32768, 8388608));
+    M.yz -= 256. * M.xy;
+    c.yzw = M;
 
     // Unpack exponent
     e += 127.0;  // add bias
