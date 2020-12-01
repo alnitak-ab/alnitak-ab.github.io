@@ -85,12 +85,12 @@ lowp vec4 encode(float v) {
     m -= c[1] / 128.0;
     c[2] = floor(32768.0 * m);     // 2^15
     m -= c[2] / 32768.0;
-    c[3] = floor(8388608.0 * m);   // 2^23
-    //c.yzw = mod(floor(m * vec3(128., 32768., 8388608.)), 256.);
+    c[3] = 8388608.0 * m;          // 2^23
+
     // Unpack exponent
-    e += 127.0;
+    e += 127.0;  // add bias
     c[0] += floor(e / 2.0);
-    c[1] += mod(e, 2.0) * 128.0; 
+    c[1] += (e - floor(2.0 * c[0])) * 128.0; 
 
     // Scale back to range
     return c / 255.0;
@@ -182,7 +182,7 @@ y.oninput = function () {
 }
 x.oninput = function () {
     const v = eval(+this.value)
-    output.innerText = decode(v).toLocaleString() + '\n' + hexstr(v.reverse())
+    output.innerText = decode(v) + '\n' + hexstr(v.reverse())
 }
 y.oninput()
 const assert = x => {if (!x) console.error('asertion failed')}
