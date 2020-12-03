@@ -168,9 +168,12 @@ const floats = new Float32Array(bytes.buffer)
 const encode = x => { floats[0] = x; return bytes.reverse() }
 const decode = b => { bytes.set(b.reverse()); return floats[0] }
 
+let program
 y.oninput = function () {
     try {
-        const program = makeProgram(this.value)
+        if (program)
+            gl.deleteProgram(program)
+        program = makeProgram(this.value)
         xloc =  gl.getUniformLocation(program, 'x')
         gl.useProgram(program)
         x.oninput()
